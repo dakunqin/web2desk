@@ -1,0 +1,1 @@
+Write-Host "myps command works."
