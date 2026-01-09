@@ -1,0 +1,104 @@
+import win.ui;
+import win.image;
+import web.view;
+import process.popen;
+import fsys.config;
+/*DSG{{*/
+mainForm = win.form(text="web2desk";left=20;top=15;right=1600;bottom=1280)
+mainForm.add(
+edit={cls="edit";text='启动web2desk...\r\n\r\n';left=15;top=15;right=1475;bottom=1140;bgcolor=0x878787;border=1;color=0xFFFFFF;multiline=1;z=1}
+)
+/*}}*/
+
+//导入用户配置函数  
+var getEnv = function(){
+	//导入配置文件
+	var cfgDir = io.fullpath(".\env"); 
+	mainForm.config = fsys.config(cfgDir);
+	//mainForm.msgbox(mainForm.config);
+	
+	//要打开的网址
+	if(!mainForm.config.env.host) {
+    	mainForm.config.env.host = "http://127.0.0.1";
+	}
+	//窗口宽度
+	if(mainForm.config.env.width) {
+    	mainForm.width = mainForm.config.env.width;
+	}
+	//窗口高度
+	if(mainForm.config.env.height) {
+    	mainForm.height = mainForm.config.env.height;
+	}
+	//软件图标
+	if(mainForm.config.env.icon) {
+    	var hIcon = win.image.loadIconFromFile(mainForm.config.env.icon, true); 
+		// 0x0080 是 WM_SETICON消息
+		::SendMessage(mainForm.hwnd, 0x0080, , hIcon);
+	}
+	//软件标题
+	if(mainForm.config.env.title) {
+    	mainForm.text = mainForm.config.env.title;
+	}
+	//自定义窗口位置
+	if(mainForm.config.env.left && mainForm.config.env.top){
+		mainForm.setPos(mainForm.config.env.left, mainForm.config.env.top);
+	}
+	//是否全屏或最大化
+	if(mainForm.config.env.maximized){
+		mainForm.show(mainForm.config.env.maximized);
+	}
+	//运行BAT命令行文件
+	if(mainForm.config.env.preBATFile){
+		//启动进程
+		var ps = process.popen("cmd.exe", {"/c"; mainForm.config.env.preBATFile});
+        ps.codepage = 65001; // 使用 UTF-8 编码读取输出
+		ps.logResponse(mainForm.edit);//显示在edit窗口
+	}
+	//运行Powershell命令行文件
+	if(mainForm.config.env.prePSFile){
+		//启动进程
+		var ps = process.popen.ps(`-File`,mainForm.config.env.prePSFile);
+		ps.codepage = 65001; //使用 UTF-8 编码读取输出
+		ps.logResponse(mainForm.edit);//显示在edit窗口
+	}
+	//运行jsFile
+	if(mainForm.config.env.jsFile){
+		//添加event listener：等文档加载后再执行
+		mainForm.wb.onDocumentComplete = function(url){
+			var jsFileContent = string.load(mainForm.config.env.jsFile);
+			if(jsFileContent) {
+				mainForm.wb.doScript(jsFileContent);
+			}
+		}
+	}
+}
+var init = function(){
+	mainForm.wb = web.view(mainForm);
+}
+init();
+getEnv();//导入用户配置
+
+//设置时钟检测是否启动完前置命令，开启浏览器
+mainForm.setInterval( 
+   function(){
+        //获取edit文本内容
+        var content = mainForm.edit.text;
+        //如果内容为空,直接返回
+        if(!#content) return;
+		var matchString = mainForm.config.env.matchString;
+		//通过确定edit文本中有无特定字串打开网址: 如果没有定义则直接打开
+        if(!matchString || (matchString &&  string.find(content, matchString)) ){
+            mainForm.edit.hide();//隐藏edit文本以显示浏览器
+            //mainForm.wb = web.view(mainForm);
+            mainForm.wb.go(mainForm.config.env.host);//打开网址
+            return 0; //停止当前定时器 返回 0 即可停止
+        }
+    }, 500 
+)
+
+mainForm.edit.oncommand = function(id,event){
+	
+}
+
+mainForm.show();//显示主窗口
+win.loopMessage();//开启消息循环
